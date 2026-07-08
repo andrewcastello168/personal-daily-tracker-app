@@ -10,6 +10,7 @@ import {
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { UpdatePasswordDto } from './dto/update-user-password.dto';
 
 @Controller('users')
 export class UsersController {
@@ -30,12 +31,17 @@ export class UsersController {
     return this.usersService.findByUsername(username);
   }
 
-  @Patch(':username')
-  update(
-    @Param('username') username: string,
-    @Body() updateUserDto: UpdateUserDto,
+  @Patch(':id')
+  update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
+    return this.usersService.updateUser(id, updateUserDto);
+  }
+
+  @Patch(':id/password')
+  updatePassword(
+    @Param('id') id: string,
+    @Body() updatePasswordDto: UpdatePasswordDto,
   ) {
-    return this.usersService.update(username, updateUserDto);
+    return this.usersService.updatePasswordUser(id, updatePasswordDto);
   }
 
   @Delete(':username')
