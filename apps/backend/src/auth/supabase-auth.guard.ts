@@ -11,7 +11,7 @@ import type { User } from '@supabase/supabase-js';
 
 type SupabaseClientType = ReturnType<typeof createClient>;
 
-type AuthenticatedRequest = Request & {
+type RequestWithUser = Request & {
   user?: User;
 };
 
@@ -20,8 +20,12 @@ export class SupabaseAuthGuard implements CanActivate {
   private readonly supabase: SupabaseClientType;
 
   constructor(private readonly configService: ConfigService) {
-    const supabaseUrl = this.configService.get<string>('DATABASE_URL');
-    const supabaseAnonKey = this.configService.get<string>('DATABASE_ANON_KEY');
+    const supabaseUrl = this.configService.get<string>(
+      'NEST_PUBLIC_SUPABASE_URL',
+    );
+    const supabaseAnonKey = this.configService.get<string>(
+      'NEST_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
+    );
 
     if (!supabaseUrl || !supabaseAnonKey) {
       throw new Error('Supabase env belum lengkap');
@@ -31,7 +35,7 @@ export class SupabaseAuthGuard implements CanActivate {
   }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
+    const request = context.switchToHttp().getRequest<RequestWithUser>();
 
     const authHeader = request.headers.authorization;
 
@@ -45,13 +49,13 @@ export class SupabaseAuthGuard implements CanActivate {
       throw new UnauthorizedException('Format token tidak valid');
     }
 
-    const { data, error } = await this.supabase.auth.getUser(token);
+    const userResponse = await this.supabase.auth.getUser(token);
 
-    if (error || !data.user) {
+    if (userResponse.error || !userResponse.data.user) {
       throw new UnauthorizedException('Token tidak valid');
     }
 
-    request.user = data.user;
+    request.user = userResponse.data.user;
 
     return true;
   }
