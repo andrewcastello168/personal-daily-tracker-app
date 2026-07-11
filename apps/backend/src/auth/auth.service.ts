@@ -4,13 +4,10 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { createClient } from '@supabase/supabase-js';
 import { KnexService } from '../database/knex.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
-
-type SupabaseClientType = ReturnType<typeof createClient>;
+import { SupabaseService } from 'src/supabase/supabase.service';
 
 type UserProfileRow = {
   id: string;
@@ -32,31 +29,18 @@ type UserProfilePublic = {
 
 @Injectable()
 export class AuthService {
-  private readonly supabase: SupabaseClientType;
-
   constructor(
-    private readonly configService: ConfigService,
+    private readonly supabaseService: SupabaseService,
     private readonly knexService: KnexService,
-  ) {
-    const supabaseUrl = this.configService.get<string>(
-      'NEST_PUBLIC_SUPABASE_URL',
-    );
-    const supabaseAnonKey = this.configService.get<string>(
-      'NEST_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
-    );
-
-    if (!supabaseUrl || !supabaseAnonKey) {
-      throw new Error('Supabase env belum lengkap');
-    }
-
-    this.supabase = createClient(supabaseUrl, supabaseAnonKey);
-  }
+  ) {}
 
   async register(registerDto: RegisterDto) {
     if (registerDto.username) {
       const existingUsername = await this.knexService
         .connection<UserProfileRow>('users')
-        .where({ username: registerDto.username })
+        .where({
+          username: registerDto.username,
+        })
         .first();
 
       if (existingUsername) {
@@ -64,7 +48,7 @@ export class AuthService {
       }
     }
 
-    const signUpResponse = await this.supabase.auth.signUp({
+    const signUpResponse = await this.supabaseService.client.auth.signUp({
       email: registerDto.email,
       password: registerDto.password,
       options: {
@@ -87,7 +71,9 @@ export class AuthService {
 
     const existingProfile = await this.knexService
       .connection<UserProfileRow>('users')
-      .where({ id: authUser.id })
+      .where({
+        id: authUser.id,
+      })
       .first();
 
     if (!existingProfile) {
@@ -112,16 +98,18 @@ export class AuthService {
   }
 
   async login(loginDto: LoginDto) {
-    const loginResponse = await this.supabase.auth.signInWithPassword({
-      email: loginDto.email,
-      password: loginDto.password,
-    });
+    const loginResponse =
+      await this.supabaseService.client.auth.signInWithPassword({
+        email: loginDto.email,
+        password: loginDto.password,
+      });
 
     if (loginResponse.error) {
       throw new UnauthorizedException(loginResponse.error.message);
     }
 
     const authUser = loginResponse.data.user;
+
     const session = loginResponse.data.session;
 
     if (!authUser || !session) {
@@ -130,7 +118,9 @@ export class AuthService {
 
     const profile = await this.knexService
       .connection<UserProfileRow, UserProfilePublic>('users')
-      .where({ id: authUser.id })
+      .where({
+        id: authUser.id,
+      })
       .select('id', 'email', 'username', 'full_name', 'created_at', 'modify_dt')
       .first();
 
