@@ -1,4 +1,10 @@
-import { IsEmail, IsOptional, IsString, MinLength } from 'class-validator';
+import {
+  IsEmail,
+  IsIn,
+  IsOptional,
+  IsString,
+  MinLength,
+} from 'class-validator';
 
 export class RegisterDto {
   @IsEmail()
@@ -15,4 +21,7 @@ export class RegisterDto {
   @IsOptional()
   @IsString()
   username?: string;
+
+  @IsIn(['sim', 'prod'])
+  type!: 'sim' | 'prod';
 }

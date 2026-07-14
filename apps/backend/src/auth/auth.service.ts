@@ -8,6 +8,7 @@ import { KnexService } from '../database/knex.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { SupabaseService } from 'src/supabase/supabase.service';
+import { SupabaseMode } from 'src/supabase/supabase.config';
 
 type UserProfileRow = {
   id: string;
@@ -34,7 +35,7 @@ export class AuthService {
     private readonly knexService: KnexService,
   ) {}
 
-  async register(registerDto: RegisterDto) {
+  async register(registerDto: RegisterDto, envService: SupabaseMode) {
     if (registerDto.username) {
       const existingUsername = await this.knexService
         .connection<UserProfileRow>('users')
@@ -48,7 +49,9 @@ export class AuthService {
       }
     }
 
-    const signUpResponse = await this.supabaseService.client.auth.signUp({
+    const supabaseClients = this.supabaseService.getClient(envService);
+
+    const signUpResponse = await supabaseClients.auth.signUp({
       email: registerDto.email,
       password: registerDto.password,
       options: {
@@ -97,12 +100,14 @@ export class AuthService {
     };
   }
 
-  async login(loginDto: LoginDto) {
-    const loginResponse =
-      await this.supabaseService.client.auth.signInWithPassword({
-        email: loginDto.email,
-        password: loginDto.password,
-      });
+  async login(loginDto: LoginDto, envService: SupabaseMode) {
+    // const supabaseClients = this.supabaseService.getClient('prod');
+    const supabaseClients = this.supabaseService.getClient(envService);
+
+    const loginResponse = await supabaseClients.auth.signInWithPassword({
+      email: loginDto.email,
+      password: loginDto.password,
+    });
 
     if (loginResponse.error) {
       throw new UnauthorizedException(loginResponse.error.message);
@@ -131,6 +136,39 @@ export class AuthService {
       user: {
         id: authUser.id,
         email: authUser.email,
+        profile: profile ?? null,
+      },
+    };
+  }
+
+  async checkUser(accessToken: string, envService: SupabaseMode) {
+    const supabaseClients = this.supabaseService.getClient(envService);
+
+    const {
+      data: { user: authUser },
+      error,
+    } = await supabaseClients.auth.getUser(accessToken);
+
+    if (error || !authUser) {
+      throw new UnauthorizedException(
+        'Token tidak valid atau sudah kedaluwarsa',
+      );
+    }
+
+    const profile = await this.knexService
+      .connection<UserProfileRow, UserProfilePublic>('users')
+      .where({
+        id: authUser.id,
+      })
+      .select('id', 'email', 'username', 'full_name', 'created_at', 'modify_dt')
+      .first();
+
+    return {
+      message: 'User ditemukan',
+      user: {
+        id: authUser.id,
+        email: authUser.email,
+        emailConfirmedAt: authUser.email_confirmed_at,
         profile: profile ?? null,
       },
     };

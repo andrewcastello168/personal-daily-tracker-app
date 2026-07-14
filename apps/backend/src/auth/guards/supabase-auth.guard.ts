@@ -7,6 +7,7 @@ import {
 import type { Request } from 'express';
 import type { User } from '@supabase/supabase-js';
 import { SupabaseService } from 'src/supabase/supabase.service';
+import { SupabaseMode } from 'src/supabase/supabase.config';
 
 type RequestWithUser = Request & {
   user?: User;
@@ -18,6 +19,8 @@ export class SupabaseAuthGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<RequestWithUser>();
+    const envService = process.env.APP_ENV as SupabaseMode;
+    const client = this.supabaseService.getClient(envService);
 
     const authHeader = request.headers.authorization;
 
@@ -34,7 +37,7 @@ export class SupabaseAuthGuard implements CanActivate {
     const {
       data: { user },
       error,
-    } = await this.supabaseService.client.auth.getUser(token);
+    } = await client.auth.getUser(token);
 
     if (error || !user) {
       throw new UnauthorizedException(
