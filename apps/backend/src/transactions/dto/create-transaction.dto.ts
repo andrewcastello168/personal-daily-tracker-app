@@ -1,6 +1,7 @@
 import {
   IsBoolean,
   IsDateString,
+  IsDefined,
   IsEnum,
   IsInt,
   IsNumber,
@@ -19,6 +20,18 @@ export class CreateTransactionDto {
   @IsPositive()
   @Type(() => Number)
   accountId!: number;
+
+  @ValidateIf(
+    (dto: CreateTransactionDto) =>
+      dto.transactionType === TransactionType.TRANSFER,
+  )
+  @IsDefined({
+    message: 'destinationAccountId wajib diisi untuk transaksi transfer.',
+  })
+  @IsInt()
+  @IsPositive()
+  @Type(() => Number)
+  destinationAccountId?: number;
 
   @IsEnum(TransactionType)
   transactionType!: TransactionType;
@@ -43,10 +56,6 @@ export class CreateTransactionDto {
   @MaxLength(255)
   note?: string;
 
-  /**
-   * Hanya digunakan ketika transactionType = INCOME.
-   * Jika true, backend menutup periode aktif dan membuat periode baru.
-   */
   @ValidateIf(
     (dto: CreateTransactionDto) =>
       dto.transactionType === TransactionType.INCOME,
@@ -55,10 +64,11 @@ export class CreateTransactionDto {
   @IsBoolean()
   startNewPeriod?: boolean;
 
-  /**
-   * Wajib dikirim jika startNewPeriod = true.
-   */
   @ValidateIf((dto: CreateTransactionDto) => dto.startNewPeriod === true)
+  @IsDefined({
+    message:
+      'savingPercentage wajib diisi ketika startNewPeriod bernilai true.',
+  })
   @IsNumber({
     maxDecimalPlaces: 2,
   })
